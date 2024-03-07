@@ -11,7 +11,7 @@ collection = db["users"]
 
 bot = Client(
     "TeBot",
-    bot_token="6912200154:AAFYNRNr7CvmTve_EFOz9mF8qYEMPpqdnsM",
+    bot_token="6348649632:AAEJ62K8vK11wbtMNixFh6M2s4-q7O2eBN0",
     api_id=17249531,
     api_hash="b67965c13be2164d8a2bb6d035a1076a"
 )
