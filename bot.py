@@ -19,6 +19,7 @@ bot = Client(
     api_hash="b67965c13be2164d8a2bb6d035a1076a"
 )
 
+
 channel_username = "@Sam_Ott_Store"
 
 def check_joined():
@@ -163,20 +164,60 @@ def is_user_premium(user_id):
     return premium_collection.find_one({"user_id": user_id}) is not None
 
 async def broadcast_message(bot, user_id, chat_ids, msg):
-    successful_sends = 0  # Counter for successful message sends
+  # Counter for successful message sends
     try:
-        for chat_id in chat_ids:
-            try:
-                await bot.send_message(chat_id, msg)
-                successful_sends += 1
-            except:
-                print(f"Failed to send message to chat {chat_id}. Skipping...")
-        await bot.send_message(user_id, f"Message sent to {successful_sends} groups.")
-        await asyncio.sleep(DEFAULT_INTERVAL)
+        while True:
+            successful_sends = 0
+            for chat_id in chat_ids:
+                try:
+                    await bot.send_message(chat_id, msg)
+                    successful_sends += 1
+                except:
+                    print(f"Failed to send message to chat {chat_id}. Skipping...")
+            await bot.send_message(user_id, f"Message sent to {successful_sends} groups.")
+            await asyncio.sleep(DEFAULT_INTERVAL)
     except asyncio.CancelledError:
         pass
     # Send notification to user about the number of successful sends
     #await bot.send_message(user_id, f"Message sent to {successful_sends} groups.")
+@bot.on_message(filters.command("msgall") & filters.private)
+async def broadcast_message(bot, message: Message):
+    # Check if user is admin
+    if message.from_user.id not in ADMIN_ID:
+        await message.reply_text("You are not authorized to use this command.")
+        return
 
+    # If the user replied to a text message
+    if message.reply_to_message and message.reply_to_message.text:
+        # Extract the text
+        msg = message.reply_to_message.text
+    else:
+        await message.reply_text("You need to reply to a text message to broadcast it.")
+        return
+
+    # Get all users using the bot
+    users = premium_collection.find({})
+
+    total_users = 0
+    success_count = 0
+    error_count = 0
+
+    # Count total number of users
+    total_users = premium_collection.count_documents({})
+    print(f"Total number of users: {total_users}")
+
+    await message.reply_text("Broadcasting...")
+
+    # Send the message to all users
+    for user in users:
+        try:
+            # Broadcasting the text message without parse_mode
+            await bot.send_message(user['user_id'], msg)
+            success_count += 1
+        except Exception as e:
+            error_count += 1
+            print(f"Failed to send broadcast message to user {user['user_id']}: {e}")
+
+    await message.reply_text(f"Broadcast message sent to {success_count} users with {error_count} errors.")
 
 bot.run()
