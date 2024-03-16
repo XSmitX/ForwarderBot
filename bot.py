@@ -43,7 +43,7 @@ ADMIN_ID = [6121699672, 6971497666]
 # Dictionary to store broadcasting tasks for each user
 broadcasting_tasks = {}
 # Default interval in seconds
-DEFAULT_INTERVAL = 60
+DEFAULT_INTERVAL = 300
 
 @bot.on_message(filters.command('start') & check_joined())
 async def start(bot, message):
@@ -76,20 +76,51 @@ async def add_chat_id(bot, message):
  #       await bot.send_message(message.chat.id, f"Chat ID {chat_id} added successfully.")
  #   else:
  #       await bot.send_message(message.chat.id, "Only the admin can add chat IDs.")
-
 @bot.on_message(filters.command("adduser") & filters.private)
 async def add_user_to_premium(bot, message):
     user_id = message.from_user.id
-    if message.from_user.id not in ADMIN_ID:
-        await bot.send_message(message.chat.id, "Only the admin can add chat IDs.")
+    if user_id not in ADMIN_ID:
+        await bot.send_message(message.chat.id, "Only the admin can add users to premium.")
         return
     try:
         user_to_add_id = int(message.text.split()[1])
-        premium_collection.insert_one({"user_id": user_to_add_id})
-        await bot.send_message(message.chat.id, f"User {user_to_add_id} added to premium.")
+        if premium_collection.find_one({"user_id": user_to_add_id}):
+            await bot.send_message(message.chat.id, f"User {user_to_add_id} is already a premium user.")
+        else:
+            premium_collection.insert_one({"user_id": user_to_add_id})
+            await bot.send_message(message.chat.id, f"User {user_to_add_id} added to premium.")
     except ValueError:
         await bot.send_message(message.chat.id, "Invalid user ID provided.")
  
+@bot.on_message(filters.command("removeuser") & filters.private)
+async def remove_user_from_premium(bot, message):
+    user_id = message.from_user.id
+    if user_id not in ADMIN_ID:
+        await bot.send_message(message.chat.id, "Only the admin can remove users.")
+        return
+    try:
+        user_to_remove_id = int(message.text.split()[1])
+        deleted_count = premium_collection.delete_many({"user_id": user_to_remove_id}).deleted_count
+        if deleted_count:
+            await bot.send_message(message.chat.id, f"User {user_to_remove_id} removed from premium.")
+        else:
+            await bot.send_message(message.chat.id, f"User {user_to_remove_id} not found in premium users list.")
+    except ValueError:
+        await bot.send_message(message.chat.id, "Invalid user ID provided.")
+
+@bot.on_message(filters.command("stats") & filters.private)
+async def premium_users_stats(bot, message):
+    if message.from_user.id not in ADMIN_ID:
+        await bot.send_message(message.chat.id, "Only the admin can view stats.")
+        return
+    premium_users = premium_collection.find()
+    count_users = premium_collection.count_documents({})
+    users_list = "\n".join([str(user["user_id"]) for user in premium_users])
+    if users_list:
+        await bot.send_message(message.chat.id, f"Total Premium Users: {count_users}\n\nPremium Users List:\n{users_list}")
+    else:
+        await bot.send_message(message.chat.id, "No premium users found.")
+
 
 @bot.on_message(filters.command("broadcast") & filters.private & check_joined())
 async def start_broadcast(bot, message):
@@ -113,6 +144,8 @@ async def start_broadcast(bot, message):
 
             broadcasting_tasks[user_id] = asyncio.create_task(broadcast_message(bot, user_id, chat_ids, msg))
             await bot.send_message(message.chat.id, f"Broadcasting started with an interval of {DEFAULT_INTERVAL} seconds.")
+            # Inform the user that broadcasting has started
+            await bot.send_message(user_id, "Broadcasting started.")
     else:
         await bot.send_message(message.chat.id, f"You are not a premium user. \nContact @Sam_Hub_Op to upgrade to premium.\nYour User id is : <code>{user_id}</code>")
 
@@ -130,15 +163,20 @@ def is_user_premium(user_id):
     return premium_collection.find_one({"user_id": user_id}) is not None
 
 async def broadcast_message(bot, user_id, chat_ids, msg):
+    successful_sends = 0  # Counter for successful message sends
     try:
-        while True:
-            for chat_id in chat_ids:
-                try:
-                    await bot.send_message(chat_id, msg)
-                except:
-                    print(f"Failed to send message to chat {chat_id}. Skipping...")
-            await asyncio.sleep(DEFAULT_INTERVAL)
+        for chat_id in chat_ids:
+            try:
+                await bot.send_message(chat_id, msg)
+                successful_sends += 1
+            except:
+                print(f"Failed to send message to chat {chat_id}. Skipping...")
+        await bot.send_message(user_id, f"Message sent to {successful_sends} groups.")
+        await asyncio.sleep(DEFAULT_INTERVAL)
     except asyncio.CancelledError:
         pass
+    # Send notification to user about the number of successful sends
+    #await bot.send_message(user_id, f"Message sent to {successful_sends} groups.")
+
 
 bot.run()
