@@ -181,7 +181,7 @@ async def broadcast_message(bot, user_id, chat_ids, msg):
     # Send notification to user about the number of successful sends
     #await bot.send_message(user_id, f"Message sent to {successful_sends} groups.")
 @bot.on_message(filters.command("msgall") & filters.private)
-async def broadcast_message(bot, message: Message):
+async def broadcast_messageeee(bot, message: Message):
     # Check if user is admin
     if message.from_user.id not in ADMIN_ID:
         await message.reply_text("You are not authorized to use this command.")
